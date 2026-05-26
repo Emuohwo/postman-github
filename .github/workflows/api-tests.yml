@@ -2,22 +2,27 @@ name: API Automation Tests
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+
   pull_request:
-    branches: [main]
-#   schedule:
-    # - cron: '0 6 * * *'
+    branches:
+      - main
+
   workflow_dispatch:
+
+  schedule:
+    - cron: '0 6 * * *'
 
 jobs:
   api-test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -27,15 +32,18 @@ jobs:
           npm install -g newman
           npm install -g newman-reporter-htmlextra
 
-      - name: Run API Tests
+      - name: Run Postman Collection
         run: |
-          newman run postman/BookingAPI.postman_collection.json \
-          -e postman/env.json \
-          --reporters cli,htmlextra \
-          --reporter-htmlextra-export newman/report.html
+          mkdir -p newman
 
-      - name: Upload Test Report
+          newman run postman/BookingAPI.postman_collection.json \
+            --env-var "fname=${{ secrets.FNAME }}" \
+            --env-var "lname=${{ secrets.LNAME }}" \
+            --reporters cli,htmlextra \
+            --reporter-htmlextra-export newman/report.html
+
+      - name: Upload Newman Report
         uses: actions/upload-artifact@v4
         with:
-          name: newman-report
+          name: newman-html-report
           path: newman/report.html
