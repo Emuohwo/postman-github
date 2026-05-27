@@ -39,6 +39,9 @@ jobs:
           newman run postman/BookingAPI.postman_collection.json \
             --env-var "fname=${{ secrets.FNAME }}" \
             --env-var "lname=${{ secrets.LNAME }}" \
+            --env-var "username=${{ secrets.USERNAME }}" \
+            --env-var "password=${{ secrets.PASSWORD }}" \
+            --env-var "base_url=${{ secrets.BASE_URL }}" \
             --reporters cli,htmlextra \
             --reporter-htmlextra-export newman/report.html
 
