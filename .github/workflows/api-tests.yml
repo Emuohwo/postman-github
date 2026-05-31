@@ -42,11 +42,56 @@ jobs:
             --env-var "username=${{ secrets.USERNAME }}" \
             --env-var "password=${{ secrets.PASSWORD }}" \
             --env-var "base_url=${{ secrets.BASE_URL }}" \
-            --reporters cli,htmlextra \
+            --reporters cli,json,htmlextra \
+            --reporter-json-export newman/report.json \
             --reporter-htmlextra-export newman/report.html
 
-      - name: Upload Newman Report
+      - name: Generate Markdown Report
+        run: |
+          TOTAL=$(jq '.run.stats.requests.total' newman/report.json)
+          FAILED=$(jq '.run.stats.assertions.failed' newman/report.json)
+          PASSED=$(jq '.run.stats.assertions.total - .run.stats.assertions.failed' newman/report.json)
+          EXECUTION_TIME=$(jq '.run.timings.completed - .run.timings.started' newman/report.json)
+
+          cat > newman/report.md << EOF
+          # Newman Test Report
+
+          ## Summary
+
+          | Metric | Value |
+          |---------|---------|
+          | Total Requests | $TOTAL |
+          | Passed Assertions | $PASSED |
+          | Failed Assertions | $FAILED |
+          | Execution Time (ms) | $EXECUTION_TIME |
+
+          ## Result
+
+          $(if [ "$FAILED" -eq 0 ]; then
+              echo "✅ All tests passed successfully."
+            else
+              echo "❌ Some tests failed. Check the HTML report for details."
+            fi)
+          EOF
+
+      - name: Upload Newman Reports
         uses: actions/upload-artifact@v4
         with:
-          name: newman-html-report
-          path: newman/report.html
+          name: newman-reports
+          path: |
+            newman/report.html
+            newman/report.json
+            newman/report.md
+
+      - name: Commit Markdown Report
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          mkdir -p reports
+          cp newman/report.md reports/latest-report.md
+
+          git add reports/latest-report.md
+          git commit -m "Update Newman report [skip ci]" || echo "No changes to commit"
+          git push
