@@ -7,7 +7,7 @@
 | Total Requests | 10 |
 | Passed Assertions | 19 |
 | Failed Assertions | 0 |
-| Execution Time (ms) | 438 |
+| Execution Time (ms) | 684 |
 
 ## Result
 
