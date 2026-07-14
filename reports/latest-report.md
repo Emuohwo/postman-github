@@ -1,14 +1,13 @@
 # Newman Test Report
 
-## Summary
-
 | Metric | Value |
-|---------|---------|
+|--------|-------|
+| Status | PASSED ✅ |
+| Duration | 0.75s |
 | Total Requests | 10 |
-| Passed Assertions | 19 |
-| Failed Assertions | 0 |
-| Execution Time (ms) | 698 |
-
-## Result
+| Total Assertions | 19 |
+| Passed | 19 |
+| Failed | 0 |
+| Pass Rate | 100.00% |
 
 ✅ All tests passed successfully.
