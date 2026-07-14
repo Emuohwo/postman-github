@@ -4,18 +4,20 @@ on:
   push:
     branches:
       - main
+      - develop
 
   pull_request:
     branches:
       - main
+      - develop
 
   workflow_dispatch:
 
   schedule:
-    - cron: '0 6 * * *'
+    - cron: "0 6 * * *"
 
 jobs:
-  api-test:
+  api-tests:
     runs-on: ubuntu-latest
 
     steps:
@@ -30,11 +32,12 @@ jobs:
       - name: Install Newman
         run: |
           npm install -g newman
+          npm install -g newman-reporter-json
           npm install -g newman-reporter-htmlextra
 
-      - name: Run Postman Collection
+      - name: Execute Postman Collection
         run: |
-          mkdir -p newman
+          mkdir -p reports
 
           newman run postman/BookingAPI.postman_collection.json \
             --env-var "fname=${{ secrets.FNAME }}" \
@@ -42,36 +45,99 @@ jobs:
             --env-var "username=${{ secrets.USERNAME }}" \
             --env-var "password=${{ secrets.PASSWORD }}" \
             --env-var "base_url=${{ secrets.BASE_URL }}" \
-            --reporters cli,json,htmlextra \
-            --reporter-json-export newman/report.json \
-            --reporter-htmlextra-export newman/report.html
+            -r cli,json,htmlextra \
+            --reporter-json-export reports/newman-report.json \
+            --reporter-htmlextra-export reports/newman-report.html
 
-      - name: Generate Markdown Report
+      - name: Generate Execution Summary
         run: |
-          TOTAL=$(jq '.run.stats.requests.total' newman/report.json)
-          FAILED=$(jq '.run.stats.assertions.failed' newman/report.json)
-          PASSED=$(jq '.run.stats.assertions.total - .run.stats.assertions.failed' newman/report.json)
-          EXECUTION_TIME=$(jq '.run.timings.completed - .run.timings.started' newman/report.json)
+          node <<'EOF'
+          const fs = require('fs');
 
-          cat > newman/report.md << EOF
-          # Newman Test Report
+          const report = JSON.parse(
+            fs.readFileSync('reports/newman-report.json', 'utf8')
+          );
 
-          ## Summary
+          let passed = 0;
+          let failed = 0;
+
+          report.run.executions.forEach(exec => {
+            (exec.assertions || []).forEach(assertion => {
+              if (assertion.error) {
+                failed++;
+              } else {
+                passed++;
+              }
+            });
+          });
+
+          const totalAssertions = passed + failed;
+          const totalRequests = report.run.stats.requests.total;
+          const duration =
+            (report.run.timings.completed - report.run.timings.started) / 1000;
+
+          const passRate =
+            totalAssertions === 0
+              ? 0
+              : (passed / totalAssertions) * 100;
+
+          const status = failed === 0 ? "PASSED ✅" : "FAILED ❌";
+
+          console.log("=======================================");
+          console.log("API TEST EXECUTION SUMMARY");
+          console.log("=======================================");
+          console.log(`Status           : ${status}`);
+          console.log(`Duration         : ${duration.toFixed(2)}s`);
+          console.log(`Total Requests   : ${totalRequests}`);
+          console.log(`Total Assertions : ${totalAssertions}`);
+          console.log(`Passed           : ${passed}`);
+          console.log(`Failed           : ${failed}`);
+          console.log(`Pass Percentage  : ${passRate.toFixed(2)}%`);
+          console.log("=======================================");
+
+          const summary = `
+          ## API Test Execution Summary
+
+          | Metric | Result |
+          |--------|--------|
+          | Status | ${status} |
+          | Duration | ${duration.toFixed(2)}s |
+          | Total Requests | ${totalRequests} |
+          | Total Assertions | ${totalAssertions} |
+          | ✅ Passed | ${passed} |
+          | ❌ Failed | ${failed} |
+          | 📊 Pass Rate | ${passRate.toFixed(2)}% |
+          `;
+
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
+
+          const markdown = `# Newman Test Report
 
           | Metric | Value |
-          |---------|---------|
-          | Total Requests | $TOTAL |
-          | Passed Assertions | $PASSED |
-          | Failed Assertions | $FAILED |
-          | Execution Time (ms) | $EXECUTION_TIME |
+          |--------|-------|
+          | Status | ${status} |
+          | Duration | ${duration.toFixed(2)}s |
+          | Total Requests | ${totalRequests} |
+          | Total Assertions | ${totalAssertions} |
+          | Passed | ${passed} |
+          | Failed | ${failed} |
+          | Pass Rate | ${passRate.toFixed(2)}% |
 
-          ## Result
+          ${failed === 0
+            ? "✅ All tests passed successfully."
+            : "❌ Some tests failed. Check the HTML report for details."}
+          `;
 
-          $(if [ "$FAILED" -eq 0 ]; then
-              echo "✅ All tests passed successfully."
-            else
-              echo "❌ Some tests failed. Check the HTML report for details."
-            fi)
+          fs.writeFileSync("reports/latest-report.md", markdown);
+
+          if (passRate < 90) {
+            console.error(
+              `Pass rate ${passRate.toFixed(2)}% is below the required 90%.`
+            );
+            process.exit(1);
+          }
+
+          console.log("✔ Quality gate passed.");
           EOF
 
       - name: Upload Newman Reports
@@ -79,9 +145,9 @@ jobs:
         with:
           name: newman-reports
           path: |
-            newman/report.html
-            newman/report.json
-            newman/report.md
+            reports/newman-report.json
+            reports/newman-report.html
+            reports/latest-report.md
 
       - name: Commit Markdown Report
         if: github.ref == 'refs/heads/main'
@@ -90,7 +156,6 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           mkdir -p reports
-          cp newman/report.md reports/latest-report.md
 
           git add reports/latest-report.md
           git commit -m "Update Newman report [skip ci]" || echo "No changes to commit"
