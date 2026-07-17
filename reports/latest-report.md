@@ -3,7 +3,7 @@
 | Metric | Value |
 |--------|-------|
 | Status | PASSED ✅ |
-| Duration | 1.44s |
+| Duration | 0.71s |
 | Total Requests | 10 |
 | Total Assertions | 19 |
 | Passed | 19 |
