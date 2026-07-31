@@ -14,30 +14,40 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install k6
         run: |
-          sudo apt-get update
-          sudo apt-get install -y gnupg software-properties-common
-          curl -s https://dl.k6.io/key.gpg | sudo apt-key add -
-          echo "deb https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo gpg -k
+          curl -fsSL https://dl.k6.io/key.gpg | sudo gpg --dearmor -o /usr/share/keyrings/k6-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
           sudo apt-get update
           sudo apt-get install -y k6
 
+      - name: Create results directory
+        run: mkdir -p results
+
       - name: Run K6 tests
         run: |
-          mkdir -p results
-          k6 run --out json=results/output.json ./tests/booking-api-test.js
+          k6 run \
+            --out json=results/output.json \
+            ./tests/booking-api-test.js
 
       - name: Generate HTML report
-        run: |
-          npm install -g k6-html-reporter
-          k6-html-reporter --json results/output.json --out results/report.html
+        uses: benc-uk/k6-reporter@v1
+        with:
+          filename: results/output.json
 
-      - name: Upload K6 results
+      - name: Upload K6 JSON results
         uses: actions/upload-artifact@v4
         with:
-          name: k6-results
-          path: results/
+          name: k6-json-results
+          path: results/output.json
+
+      - name: Upload HTML report
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-html-report
+          path: report.html
+          if-no-files-found: warn
