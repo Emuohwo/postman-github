@@ -15,7 +15,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install k6
         run: |
@@ -37,7 +37,7 @@ jobs:
           k6-html-reporter --json results/output.json --out results/report.html
 
       - name: Upload K6 results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: k6-results
           path: results/
