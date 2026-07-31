@@ -7,18 +7,16 @@ on:
   pull_request:
     branches:
       - main
-  workflow_dispatch: # allows manual trigger
+  workflow_dispatch:
 
 jobs:
   k6-test:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout your repository
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # Install k6
       - name: Install k6
         run: |
           sudo apt-get update
@@ -28,7 +26,18 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y k6
 
-      # Run the k6 script
       - name: Run K6 tests
         run: |
-          k6 run ./tests/booking-api-test.js
+          mkdir -p results
+          k6 run --out json=results/output.json ./tests/booking-api-test.js
+
+      - name: Generate HTML report
+        run: |
+          npm install -g k6-html-reporter
+          k6-html-reporter --json results/output.json --out results/report.html
+
+      - name: Upload K6 results
+        uses: actions/upload-artifact@v3
+        with:
+          name: k6-results
+          path: results/
